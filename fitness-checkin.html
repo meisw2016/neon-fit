@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#07060f" />
+<title>NEON FIT · 运动打卡工作台</title>
+<style>
+  :root{
+    --bg:#07060f; --bg2:#0d0b1a; --panel:rgba(20,16,40,.55);
+    --cyan:#00f0ff; --magenta:#ff2bd6; --purple:#9d4dff; --green:#2bff88; --amber:#ffc34d;
+    --txt:#e9ecff; --muted:#8a8fb5; --line:rgba(157,77,255,.25);
+    --glow-c:0 0 12px rgba(0,240,255,.55); --glow-m:0 0 12px rgba(255,43,214,.55);
+    --radius:16px; --sb:248px;
+    --font:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font); color:var(--txt);
+    background:
+      radial-gradient(900px 600px at 12% -10%, rgba(157,77,255,.18), transparent 60%),
+      radial-gradient(800px 600px at 100% 0%, rgba(0,240,255,.14), transparent 55%),
+      linear-gradient(160deg,var(--bg),var(--bg2));
+    background-attachment:fixed; min-height:100%; overflow-x:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #particles{position:fixed; inset:0; z-index:0; pointer-events:none}
+  .scanlines{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.4;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.18) 2px 3px);
+    mix-blend-mode:overlay}
+  .app{position:relative; z-index:2; display:flex; min-height:100vh}
+
+  /* ---------- Sidebar (PC) ---------- */
+  .sidebar{
+    width:var(--sb); flex:0 0 var(--sb); padding:26px 18px;
+    border-right:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(13,11,26,.85),rgba(7,6,15,.85));
+    backdrop-filter:blur(10px); display:flex; flex-direction:column; gap:8px;
+    position:sticky; top:0; height:100vh;
+  }
+  .brand{display:flex; align-items:center; gap:12px; margin-bottom:18px; padding:0 6px}
+  .brand .logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--cyan),var(--magenta));
+    box-shadow:var(--glow-c); font-weight:800; color:#06060f; font-size:20px}
+  .brand b{font-size:19px; letter-spacing:2px;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .brand small{display:block; color:var(--muted); font-size:11px; letter-spacing:3px}
+  .nav-item{display:flex; align-items:center; gap:12px; padding:13px 14px; border-radius:12px;
+    color:var(--muted); cursor:pointer; border:1px solid transparent; transition:.25s; font-size:15px}
+  .nav-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2}
+  .nav-item:hover{color:var(--txt); background:rgba(157,77,255,.12); border-color:var(--line)}
+  .nav-item.active{color:var(--cyan); background:rgba(0,240,255,.1); border-color:rgba(0,240,255,.4);
+    box-shadow:var(--glow-c); text-shadow:0 0 8px rgba(0,240,255,.6)}
+  .sb-foot{margin-top:auto; padding:14px; border:1px solid var(--line); border-radius:12px;
+    background:var(--panel); color:var(--muted); font-size:12px; line-height:1.7}
+  .sb-foot b{color:var(--green)}
+
+  /* ---------- Main ---------- */
+  .main{flex:1; min-width:0; padding:30px 34px 110px; max-width:1100px; margin:0 auto}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:24px}
+  .topbar h1{font-size:26px; letter-spacing:1px}
+  .topbar .date{color:var(--muted); font-size:13px}
+  .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px;
+    border:1px solid var(--line); background:var(--panel); color:var(--cyan); font-size:13px;
+    box-shadow:var(--glow-c) inset}
+
+  .view{display:none}
+  .view.show{display:block; animation:rise .55s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes rise{from{opacity:0; transform:translateY(22px)} to{opacity:1; transform:none}}
+
+  /* cards */
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; backdrop-filter:blur(8px); position:relative; overflow:hidden}
+  .card::before{content:""; position:absolute; inset:0 0 auto 0; height:2px;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta),transparent)}
+  .grid{display:grid; gap:16px}
+  .stats{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  .stat .k{color:var(--muted); font-size:12px; letter-spacing:1px}
+  .stat .v{font-size:30px; font-weight:800; margin-top:6px;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .stat .u{font-size:13px; color:var(--muted); margin-left:4px}
+  h2.sec{font-size:18px; letter-spacing:1px; margin:4px 0 14px; display:flex; align-items:center; gap:9px}
+  h2.sec::before{content:""; width:7px; height:18px; border-radius:3px;
+    background:linear-gradient(var(--cyan),var(--magenta)); box-shadow:var(--glow-c)}
+
+  /* hero */
+  .hero{text-align:left; padding:34px}
+  .hero h1{font-size:clamp(30px,6vw,52px); line-height:1.1; letter-spacing:1px;
+    background:linear-gradient(90deg,#fff,var(--cyan),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:flick 4s infinite}
+  @keyframes flick{0%,97%,100%{opacity:1}98%{opacity:.55}99%{opacity:.85}}
+  .hero p{color:var(--muted); margin:14px 0 22px; max-width:560px; line-height:1.7}
+  .btn{appearance:none; border:1px solid var(--cyan); color:var(--cyan); background:rgba(0,240,255,.08);
+    padding:12px 22px; border-radius:12px; font-size:15px; cursor:pointer; font-family:inherit;
+    transition:.2s; letter-spacing:1px}
+  .btn:hover{background:rgba(0,240,255,.18); box-shadow:var(--glow-c); transform:translateY(-2px)}
+  .btn.primary{background:linear-gradient(135deg,var(--cyan),var(--magenta)); color:#06060f; border:none; font-weight:700}
+  .btn.primary:hover{box-shadow:0 0 22px rgba(255,43,214,.5)}
+  .btn.ghost{border-color:var(--line); color:var(--muted); background:transparent}
+  .btn.ghost:hover{color:var(--txt); border-color:var(--cyan)}
+  .btn.danger{border-color:var(--magenta); color:var(--magenta); background:rgba(255,43,214,.08)}
+
+  /* form */
+  .field{margin-bottom:16px}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:8px; letter-spacing:1px}
+  .field input,.field select,.field textarea{
+    width:100%; padding:13px 14px; border-radius:12px; font-family:inherit; font-size:15px;
+    background:rgba(7,6,15,.6); border:1px solid var(--line); color:var(--txt); transition:.2s}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none; border-color:var(--cyan); box-shadow:var(--glow-c)}
+  .field textarea{resize:vertical; min-height:80px}
+  .types{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .type{display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 8px;
+    border:1px solid var(--line); border-radius:14px; cursor:pointer; background:rgba(7,6,15,.4); transition:.2s; font-size:13px}
+  .type .e{font-size:26px}
+  .type.sel{border-color:var(--cyan); box-shadow:var(--glow-c); background:rgba(0,240,255,.1)}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+
+  /* charts */
+  .chart-wrap{position:relative; height:300px}
+  .chart-wrap.sm{height:240px}
+
+  /* history */
+  .list{display:flex; flex-direction:column; gap:12px}
+  .item{display:flex; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--line);
+    border-radius:14px; background:rgba(7,6,15,.4); transition:.2s}
+  .item:hover{border-color:var(--cyan); box-shadow:var(--glow-c)}
+  .item .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(135deg,rgba(0,240,255,.18),rgba(255,43,214,.18)); flex:0 0 auto}
+  .item .meta{flex:1; min-width:0}
+  .item .meta b{font-size:15px}
+  .item .meta span{color:var(--muted); font-size:12px; display:block; margin-top:3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .item .nums{text-align:right; font-size:13px; color:var(--green); white-space:nowrap}
+  .item .nums small{color:var(--muted); display:block}
+  .item .del{background:none; border:none; color:var(--muted); cursor:pointer; padding:8px; border-radius:8px; transition:.2s}
+  .item .del:hover{color:var(--magenta); background:rgba(255,43,214,.1)}
+  .item .del svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+
+  .empty{padding:40px; text-align:center; color:var(--muted); border:1px dashed var(--line); border-radius:14px}
+  .empty .e{font-size:42px; margin-bottom:10px}
+
+  .toast{position:fixed; left:50%; bottom:90px; transform:translateX(-50%) translateY(20px);
+    background:rgba(20,16,40,.95); border:1px solid var(--cyan); color:var(--cyan); padding:12px 20px;
+    border-radius:12px; box-shadow:var(--glow-c); z-index:50; opacity:0; transition:.3s; pointer-events:none; font-size:14px}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ---------- Bottom tab (Mobile) ---------- */
+  .tabbar{display:none}
+  @media (max-width:860px){
+    :root{--sb:0px}
+    .sidebar{display:none}
+    .main{padding:22px 18px 96px}
+    .topbar h1{font-size:21px}
+    .tabbar{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:30;
+      justify-content:space-around; padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+      background:linear-gradient(180deg,rgba(7,6,15,.6),rgba(7,6,15,.96));
+      backdrop-filter:blur(12px); border-top:1px solid var(--line)}
+    .tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted);
+      font-size:11px; cursor:pointer; padding:6px 4px; transition:.2s}
+    .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2}
+    .tab.active{color:var(--cyan); text-shadow:0 0 8px rgba(0,240,255,.6)}
+    .row2{grid-template-columns:1fr}
+    .toast{bottom:80px}
+  }
+  @media (min-width:861px){ .mobile-only{display:none} }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<div class="scanlines"></div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">NF</div>
+      <div><b>NEON FIT</b><small>运动打卡工作台</small></div>
+    </div>
+    <div class="nav-item active" data-view="home">
+      <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg> 首页
+    </div>
+    <div class="nav-item" data-view="checkin">
+      <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg> 打卡
+    </div>
+    <div class="nav-item" data-view="dashboard">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg> 数据看板
+    </div>
+    <div class="nav-item" data-view="history">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg> 历史记录
+    </div>
+    <div class="sb-foot">
+      数据保存在本地浏览器<br/><b>localStorage</b><br/>离线可用 · 不上传云端
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">首页</h1>
+        <div class="date" id="todayDate"></div>
+      </div>
+      <div class="pill" id="streakPill">🔥 连续 0 天</div>
+    </div>
+
+    <!-- HOME -->
+    <section class="view show" id="view-home">
+      <div class="card hero">
+        <h1>点燃每一次<br/>训练</h1>
+        <p>赛博风格运动打卡。记录跑步、力量、瑜伽每一次突破，用霓虹图表看见自己的成长曲线。所有数据仅存于你的设备。</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn primary" data-view="checkin">⚡ 立即打卡</button>
+          <button class="btn ghost" data-view="dashboard">查看数据看板</button>
+        </div>
+      </div>
+      <div class="grid stats" style="margin-top:18px" id="homeStats"></div>
+      <div class="card grid" style="margin-top:16px; grid-template-columns:1fr 1fr; gap:18px">
+        <div>
+          <h2 class="sec">本周时长分布</h2>
+          <div class="chart-wrap sm"><canvas id="homeWeekChart"></canvas></div>
+        </div>
+        <div>
+          <h2 class="sec">最近活动</h2>
+          <div class="list" id="homeRecent"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHECKIN -->
+    <section class="view" id="view-checkin">
+      <div class="card" style="max-width:640px">
+        <h2 class="sec">今日运动打卡</h2>
+        <form id="checkinForm">
+          <div class="field">
+            <label>运动类型</label>
+            <div class="types" id="typePicker"></div>
+            <input type="hidden" id="fType" value="run" />
+          </div>
+          <div class="row2">
+            <div class="field"><label>时长（分钟）</label><input type="number" id="fDuration" min="1" max="1440" required placeholder="45" /></div>
+            <div class="field"><label>距离（km，可选）</label><input type="number" id="fDistance" min="0" step="0.1" placeholder="5.2" /></div>
+          </div>
+          <div class="field"><label>消耗卡路里（kcal，可选）</label><input type="number" id="fCalories" min="0" placeholder="320" /></div>
+          <div class="field"><label>备注（可选）</label><textarea id="fNote" placeholder="例如：配速 5'30''，状态不错"></textarea></div>
+          <div style="display:flex;gap:12px">
+            <button class="btn primary" type="submit" style="flex:1">保存打卡</button>
+            <button class="btn ghost" type="button" id="fillDemo">填入示例</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="view" id="view-dashboard">
+      <div class="grid stats" id="dashStats"></div>
+      <div class="card" style="margin-top:16px">
+        <h2 class="sec">近 7 天训练时长 / 卡路里</h2>
+        <div class="chart-wrap"><canvas id="dashWeekChart"></canvas></div>
+      </div>
+      <div class="grid" style="margin-top:16px; grid-template-columns:1fr 1fr">
+        <div class="card"><h2 class="sec">运动类型占比</h2><div class="chart-wrap sm"><canvas id="dashTypeChart"></canvas></div></div>
+        <div class="card"><h2 class="sec">累计趋势（时长）</h2><div class="chart-wrap sm"><canvas id="dashTrendChart"></canvas></div></div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history">
+      <div class="card" style="margin-top:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <h2 class="sec" style="margin:0">全部打卡记录</h2>
+          <select id="filterType" style="padding:9px 12px;border-radius:10px;background:rgba(7,6,15,.6);border:1px solid var(--line);color:var(--txt);font-family:inherit">
+            <option value="all">全部类型</option>
+          </select>
+        </div>
+        <div class="list" id="historyList" style="margin-top:16px"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Bottom Tab (Mobile) -->
+<nav class="tabbar">
+  <div class="tab active" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>首页</div>
+  <div class="tab" data-view="checkin"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>打卡</div>
+  <div class="tab" data-view="dashboard"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>看板</div>
+  <div class="tab" data-view="history"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>记录</div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== Chart.js (inlined for offline use) ===== -->
+<script>/*__CHARTJS__*/</script>
+
+<!-- ===== App ===== -->
+<script>
+(function(){
+  "use strict";
+  var TYPES = {
+    run:{name:"跑步",emoji:"🏃",color:"#00f0ff"},
+    cycle:{name:"骑行",emoji:"🚴",color:"#ff2bd6"},
+    strength:{name:"力量",emoji:"🏋️",color:"#9d4dff"},
+    yoga:{name:"瑜伽",emoji:"🧘",color:"#2bff88"},
+    swim:{name:"游泳",emoji:"🏊",color:"#4da6ff"},
+    rope:{name:"跳绳",emoji:"🤾",color:"#ffc34d"}
+  };
+  var KEY = "neonfit_checkins_v1";
+  var STORE = {
+    load:function(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } },
+    save:function(d){ localStorage.setItem(KEY, JSON.stringify(d)); }
+  };
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function fmtDate(s){ var p=s.split("-"); return p[1]+"/"+p[2]; }
+  function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove("show");},1900); }
+
+  /* ---------- Router ---------- */
+  var TITLES = {home:"首页",checkin:"打卡",dashboard:"数据看板",history:"历史记录"};
+  function showView(v){
+    document.querySelectorAll(".view").forEach(function(el){ el.classList.remove("show"); });
+    var sec=document.getElementById("view-"+v); if(sec) sec.classList.add("show");
+    document.querySelectorAll(".nav-item,.tab").forEach(function(el){ el.classList.toggle("active", el.dataset.view===v); });
+    document.getElementById("pageTitle").textContent = TITLES[v]||"";
+    window.scrollTo({top:0,behavior:"smooth"});
+    if(v==="home") renderHome();
+    if(v==="dashboard") renderDashboard();
+    if(v==="history") renderHistory();
+  }
+  document.querySelectorAll("[data-view]").forEach(function(el){
+    el.addEventListener("click", function(){ showView(this.dataset.view); });
+  });
+
+  /* ---------- Type picker ---------- */
+  var picker=document.getElementById("typePicker");
+  Object.keys(TYPES).forEach(function(k,i){
+    var t=TYPES[k]; var d=document.createElement("div");
+    d.className="type"+(i===0?" sel":""); d.dataset.type=k;
+    d.innerHTML='<span class="e">'+t.emoji+'</span>'+t.name;
+    d.addEventListener("click",function(){
+      picker.querySelectorAll(".type").forEach(function(x){x.classList.remove("sel");});
+      d.classList.add("sel"); document.getElementById("fType").value=k;
+    });
+    picker.appendChild(d);
+  });
+
+  /* ---------- Form ---------- */
+  document.getElementById("fillDemo").addEventListener("click",function(){
+    document.getElementById("fDuration").value=45;
+    document.getElementById("fDistance").value=(3+Math.random()*5).toFixed(1);
+    document.getElementById("fCalories").value=Math.round(250+Math.random()*200);
+    document.getElementById("fNote").value="示例：状态不错，继续坚持 💪";
+  });
+  document.getElementById("checkinForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var dur=parseInt(document.getElementById("fDuration").value,10);
+    if(!dur||dur<=0){ toast("请填写有效时长"); return; }
+    var rec={
+      id:uid(), date:todayStr(), type:document.getElementById("fType").value,
+      duration:dur,
+      distance:parseFloat(document.getElementById("fDistance").value)||0,
+      calories:parseInt(document.getElementById("fCalories").value,10)||0,
+      note:document.getElementById("fNote").value.trim(),
+      createdAt:Date.now()
+    };
+    var data=STORE.load(); data.push(rec); STORE.save(data);
+    this.reset();
+    picker.querySelector(".type").classList.add("sel");
+    picker.querySelectorAll(".type:not(:first-child)").forEach(function(x){x.classList.remove("sel");});
+    document.getElementById("fType").value="run";
+    toast("✅ 打卡成功 · "+TYPES[rec.type].name+" "+rec.duration+" 分钟");
+    updateStreak();
+  });
+
+  /* ---------- Stats helpers ---------- */
+  function last7(){ var a=[]; var base=new Date(); for(var i=6;i>=0;i--){ var d=new Date(base); d.setDate(base.getDate()-i);
+    a.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")); } return a; }
+  function streak(data){
+    var set={}; data.forEach(function(r){ set[r.date]=1; });
+    var n=0; var d=new Date();
+    // if today not done, start from yesterday
+    var t=todayStr();
+    if(!set[t]){ d.setDate(d.getDate()-1); }
+    while(set[d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")]){
+      n++; d.setDate(d.getDate()-1);
+    }
+    return n;
+  }
+  function updateStreak(){
+    var s=streak(STORE.load());
+    document.getElementById("streakPill").textContent="🔥 连续 "+s+" 天";
+  }
+
+  /* ---------- Charts ---------- */
+  var charts={};
+  function destroy(k){ if(charts[k]){ charts[k].destroy(); delete charts[k]; } }
+  function neonOpts(){
+    return { plugins:{ legend:{ labels:{ color:"#8a8fb5", font:{family:"Segoe UI"} } } },
+      scales:{ x:{ ticks:{color:"#8a8fb5"}, grid:{color:"rgba(157,77,255,.12)"} },
+               y:{ ticks:{color:"#8a8fb5"}, grid:{color:"rgba(157,77,255,.12)"} } } };
+  }
+  function grad(ctx,color){
+    var g=ctx.createLinearGradient(0,0,0,260);
+    g.addColorStop(0,color+"66"); g.addColorStop(1,color+"05"); return g;
+  }
+
+  /* ---------- Home ---------- */
+  function renderHome(){
+    var data=STORE.load();
+    var totalMin=data.reduce(function(s,r){return s+r.duration;},0);
+    var totalCal=data.reduce(function(s,r){return s+r.calories;},0);
+    var days=new Set(data.map(function(r){return r.date;})).size;
+    var homeStats=document.getElementById("homeStats");
+    homeStats.innerHTML=
+      stat("总打卡",data.length,"次")+stat("总时长",totalMin,"分")+
+      stat("总消耗",totalCal,"kcal")+stat("活跃天数",days,"天");
+    // week chart
+    var wk=last7(); var byDay={}; wk.forEach(function(d){byDay[d]=0;});
+    data.forEach(function(r){ if(byDay[r.date]!=null) byDay[r.date]+=r.duration; });
+    destroy("homeWeek");
+    var c=document.getElementById("homeWeekChart");
+    charts.homeWeek=new Chart(c,{
+      type:"bar",
+      data:{ labels:wk.map(fmtDate),
+        datasets:[{ label:"时长(分)", data:wk.map(function(d){return byDay[d];}),
+          backgroundColor:grad(c.getContext("2d"),"#00f0ff"), borderColor:"#00f0ff", borderWidth:1.5, borderRadius:6 }]},
+      options:neonOpts()
+    });
+    // recent
+    var recent=data.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).slice(0,5);
+    var box=document.getElementById("homeRecent");
+    if(!recent.length){ box.innerHTML='<div class="empty"><div class="e">📡</div>还没有记录，去打卡吧</div>'; }
+    else box.innerHTML=recent.map(function(r){
+      var t=TYPES[r.type];
+      return '<div class="item"><div class="ic">'+t.emoji+'</div><div class="meta"><b>'+t.name+'</b><span>'+r.date+' · '+r.duration+' 分钟</span></div><div class="nums">'+r.calories+'<small>kcal</small></div></div>';
+    }).join("");
+  }
+  function stat(k,v,u){ return '<div class="card stat"><div class="k">'+k+'</div><div class="v">'+v+'<span class="u">'+u+'</span></div></div>'; }
+
+  /* ---------- Dashboard ---------- */
+  function renderDashboard(){
+    var data=STORE.load();
+    if(!data.length){
+      document.getElementById("dashStats").innerHTML=stat("暂无数据","—","");
+      ["dashWeek","dashType","dashTrend"].forEach(destroy);
+      ["dashWeekChart","dashTypeChart","dashTrendChart"].forEach(function(id){
+        var cv=document.getElementById(id); if(cv){ var x=cv.getContext("2d"); x.clearRect(0,0,cv.width,cv.height); }
+      });
+      return;
+    }
+    var totalMin=data.reduce(function(s,r){return s+r.duration;},0);
+    var totalCal=data.reduce(function(s,r){return s+r.calories;},0);
+    var avg=Math.round(totalMin/data.length);
+    document.getElementById("dashStats").innerHTML=
+      stat("总次数",data.length,"次")+stat("总时长",totalMin,"分")+
+      stat("总消耗",totalCal,"kcal")+stat("平均/次",avg,"分");
+    // week chart (duration + calories)
+    var wk=last7(); var durBy={},calBy={}; wk.forEach(function(d){durBy[d]=0;calBy[d]=0;});
+    data.forEach(function(r){ if(durBy[r.date]!=null){ durBy[r.date]+=r.duration; calBy[r.date]+=r.calories; } });
+    destroy("dashWeek");
+    var c1=document.getElementById("dashWeekChart");
+    charts.dashWeek=new Chart(c1,{
+      type:"bar",
+      data:{ labels:wk.map(fmtDate),
+        datasets:[
+          { label:"时长(分)", data:wk.map(function(d){return durBy[d];}), backgroundColor:grad(c1.getContext("2d"),"#00f0ff"), borderColor:"#00f0ff", borderWidth:1.5, borderRadius:6 },
+          { label:"卡路里", type:"line", data:wk.map(function(d){return calBy[d];}), borderColor:"#ff2bd6", backgroundColor:"#ff2bd6", tension:.4, fill:false, pointBackgroundColor:"#ff2bd6", yAxisID:"y1" }
+        ]},
+      options:Object.assign(neonOpts(),{ scales:{
+        x:{ ticks:{color:"#8a8fb5"}, grid:{color:"rgba(157,77,255,.12)"} },
+        y:{ ticks:{color:"#8a8fb5"}, grid:{color:"rgba(157,77,255,.12)"}, position:"left" },
+        y1:{ ticks:{color:"#ff2bd6"}, grid:{display:false}, position:"right" } } })
+    });
+    // type doughnut
+    var byT={}; data.forEach(function(r){ byT[r.type]=(byT[r.type]||0)+r.duration; });
+    var keys=Object.keys(byT);
+    destroy("dashType");
+    var c2=document.getElementById("dashTypeChart");
+    charts.dashType=new Chart(c2,{
+      type:"doughnut",
+      data:{ labels:keys.map(function(k){return TYPES[k].name;}),
+        datasets:[{ data:keys.map(function(k){return byT[k];}),
+          backgroundColor:keys.map(function(k){return TYPES[k].color;}), borderColor:"#07060f", borderWidth:2 }]},
+      options:{ plugins:{ legend:{ position:"bottom", labels:{ color:"#8a8fb5" } } } }
+    });
+    // trend (cumulative duration over time, sorted by date)
+    var sorted=data.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+    var cum=0; var pts=sorted.map(function(r){ cum+=r.duration; return {x:r.date,y:cum}; });
+    destroy("dashTrend");
+    var c3=document.getElementById("dashTrendChart");
+    charts.dashTrend=new Chart(c3,{
+      type:"line",
+      data:{ labels:pts.map(function(p){return p.x;}),
+        datasets:[{ label:"累计时长", data:pts.map(function(p){return p.y;}),
+          borderColor:"#9d4dff", backgroundColor:grad(c3.getContext("2d"),"#9d4dff"), fill:true, tension:.35, pointBackgroundColor:"#9d4dff" }]},
+      options:neonOpts()
+    });
+  }
+
+  /* ---------- History ---------- */
+  function renderHistory(){
+    var data=STORE.load().slice().sort(function(a,b){return b.createdAt-a.createdAt;});
+    var box=document.getElementById("historyList");
+    var f=document.getElementById("filterType");
+    if(f.options.length<=1){ Object.keys(TYPES).forEach(function(k){ var o=document.createElement("option"); o.value=k; o.textContent=TYPES[k].name; f.appendChild(o); }); }
+    var fv=f.value||"all";
+    var list=data.filter(function(r){ return fv==="all"||r.type===fv; });
+    if(!list.length){ box.innerHTML='<div class="empty"><div class="e">🛰️</div>'+(data.length?"该类型暂无记录":"还没有打卡记录，去首页打卡吧")+'</div>'; return; }
+    box.innerHTML=list.map(function(r){
+      var t=TYPES[r.type];
+      var extra=(r.distance?(" · "+r.distance+"km"):"")+(r.calories?(" · "+r.calories+"kcal"):"");
+      return '<div class="item"><div class="ic">'+t.emoji+'</div>'+
+        '<div class="meta"><b>'+t.name+' · '+r.duration+' 分钟</b>'+
+        '<span>'+r.date+extra+(r.note?(" · "+r.note):"")+'</span></div>'+
+        '<button class="del" data-id="'+r.id+'" title="删除"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>';
+    }).join("");
+    box.querySelectorAll(".del").forEach(function(b){
+      b.addEventListener("click",function(){
+        var id=this.dataset.id; var nd=STORE.load().filter(function(r){return r.id!==id;});
+        STORE.save(nd); toast("🗑️ 已删除"); updateStreak(); renderHistory();
+      });
+    });
+  }
+  document.getElementById("filterType").addEventListener("change",renderHistory);
+
+  /* ---------- Particles ---------- */
+  function initParticles(){
+    var cv=document.getElementById("particles"); var ctx=cv.getContext("2d");
+    var w,h,pts; var COLORS=["#00f0ff","#ff2bd6","#9d4dff"];
+    function resize(){ w=cv.width=window.innerWidth; h=cv.height=window.innerHeight;
+      var n=Math.min(80,Math.floor(w*h/16000));
+      pts=[]; for(var i=0;i<n;i++){ pts.push({x:Math.random()*w,y:Math.random()*h,
+        vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,c:COLORS[i%3]}); } }
+    resize(); window.addEventListener("resize",resize);
+    function loop(){
+      ctx.clearRect(0,0,w,h);
+      for(var i=0;i<pts.length;i++){
+        var p=pts[i]; p.x+=p.vx; p.y+=p.vy;
+        if(p.x<0||p.x>w)p.vx*=-1; if(p.y<0||p.y>h)p.vy*=-1;
+        ctx.beginPath(); ctx.arc(p.x,p.y,1.8,0,6.283); ctx.fillStyle=p.c; ctx.fill();
+        for(var j=i+1;j<pts.length;j++){
+          var q=pts[j]; var dx=p.x-q.x, dy=p.y-q.y; var d=dx*dx+dy*dy;
+          if(d<14000){ ctx.globalAlpha=1-d/14000; ctx.strokeStyle=p.c; ctx.lineWidth=.6;
+            ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); ctx.globalAlpha=1; }
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  }
+
+  /* ---------- Init ---------- */
+  document.getElementById("todayDate").textContent=todayStr()+" · NEON FIT OS";
+  initParticles();
+  updateStreak();
+  renderHome();
+  // hash routing
+  function fromHash(){ var v=location.hash.replace("#",""); if(v&&TITLES[v]) showView(v); }
+  window.addEventListener("hashchange",fromHash);
+  document.querySelectorAll("[data-view]").forEach(function(el){
+    el.addEventListener("click",function(){ location.hash=this.dataset.view; });
+  });
+})();
+</script>
+</body>
+</html>
